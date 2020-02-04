@@ -516,7 +516,11 @@ void PropellerProfWriter::writeBranches(std::ofstream &fout) {
 
       char Type = ' ';
       if (ToSym->ContainingFunc->Addr == AdjustedTo) {
-        Type = 'C';
+        // Tail call
+        if (FromSym->isTailCallBlock() && (AdjustedFrom >= FromSym->Addr + FromSym->Size - 5))
+          Type = 'T';
+        else
+          Type = 'C';
       } else if (AdjustedTo != ToSym->Addr) {
         Type = 'R';
       }
