@@ -558,14 +558,14 @@ void PropellerProfWriter::writeBranches(std::ofstream &fout) {
       if (fromSym->containingFunc != toSym->containingFunc)
         crossFunctionCounters += cnt;
 
-      char Type = ' ';
-      if (ToSym->ContainingFunc->Addr == AdjustedTo) {
+      char type = ' ';
+      if (toSym->containingFunc->addr == adjustedTo) {
         // Tail call
-        if (FromSym->isTailCallBlock() && (AdjustedFrom >= FromSym->Addr + FromSym->Size - 5))
-          Type = 'T';
+        if (fromSym->isTailCallBlock() && (adjustedFrom >= fromSym->addr + fromSym->size - 5))
+          type = 'T';
         else
-          Type = 'C';
-      } else if (AdjustedTo != ToSym->Addr) {
+          type = 'C';
+      } else if (adjustedTo != toSym->addr) {
         type = 'r';
       }
       brCntSummation[std::make_tuple(fromSym, toSym, type)] += cnt;
