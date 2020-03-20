@@ -920,10 +920,11 @@ bool PropellerProfWriter::populateSymbolMap() {
   // relationship.
   uint64_t bbSymbolDropped = 0;
   decltype(addrMap)::iterator lastFuncPos = addrMap.end();
-  for (auto p = addrMap.begin(), q = addrMap.end(); p != q; ++p) {
+  for (auto p = addrMap.begin(); p != addrMap.end();
+       (p->second.empty() ? p = addrMap.erase(p) : ++p)) {
     int funcCount = 0;
     for (auto *sym : p->second) {
-      if (sym->isFunction()) {
+      if (!sym->bbTag) {
         if (++funcCount > 1) {
           // 2 different functions start at the same address, but with different
           // sizes, this is not supported.
@@ -937,16 +938,18 @@ bool PropellerProfWriter::populateSymbolMap() {
     }
 
     if (lastFuncPos == addrMap.end()) continue;
-    for (auto *sym : p->second) {
+    for (auto symi = p->second.begin(); symi != p->second.end();) {
+      SymbolEntry *sym = *symi;
       if (!sym->bbTag) {
         // Set a function's wrapping function to itself.
         sym->containingFunc = sym;
+	++symi;
         continue;
       }
       // This is a bb symbol, find a wrapping func for it.
       SymbolEntry *containingFunc = nullptr;
       for (SymbolEntry *fp : lastFuncPos->second) {
-        if (fp->isFunction() && !fp->bbTag && containsAnotherSymbol(fp,sym) &&
+        if (!fp->bbTag && containsAnotherSymbol(fp,sym) &&
             isFunctionForBBName(fp, sym->name)) {
           if (containingFunc == nullptr) {
             containingFunc = fp;
@@ -977,7 +980,7 @@ bool PropellerProfWriter::populateSymbolMap() {
           tempI = std::prev(tempI);
           bool isFunction = false;
           for (auto *KS : tempI->second) {
-            isFunction |= KS->isFunction();
+            isFunction |= !KS->bbTag;
             if (KS->isFunction() && !KS->bbTag &&
                 containsAnotherSymbol(KS, sym) &&
                 isFunctionForBBName(KS, sym->name)) {
@@ -995,8 +998,8 @@ bool PropellerProfWriter::populateSymbolMap() {
         LOG(ERROR) << "Dropped bb symbol without any wrapping function: \""
                    << SymShortF(sym) << "\"";
         ++bbSymbolDropped;
-        addrMap.erase(p--);
-        break;
+	symi = p->second.erase(symi);
+	continue;  // to next symbol in p->second.
       } else {
         if (!isFunctionForBBName(containingFunc, sym->name)) {
           LOG(ERROR) << "Internal check warning: \n"
@@ -1043,9 +1046,10 @@ bool PropellerProfWriter::populateSymbolMap() {
       assert(r);
       if (fName != sym->containingFunc->name) {
         LOG(ERROR) << "Internal check error: bb symbol '" << sym->name.str()
-                       << "' does not have a valid wrapping function.";
+		   << "' does not have a valid wrapping function.";
       }
       sym->name = bName;
+      ++symi;
     }  // End of iterating p->second
   }    // End of iterating addrMap.
   if (bbSymbolDropped)
