@@ -478,9 +478,9 @@ void PropellerProfWriter::writeBranches(std::ofstream &fout) {
     if (!fromN || !toN)
       continue;
     if (fromN->controlFlowGraph == toN->controlFlowGraph)
-      fromN->controlFlowGraph->mapBranch(fromN, toN, cnt, type == 'C', type == 'R');
+      fromN->controlFlowGraph->mapBranch(fromN, toN, cnt, type == 'C', type == 'T', type == 'R');
     else
-      fromN->controlFlowGraph->mapCallOut(fromN, toN, 0, cnt, type == 'C',
+      fromN->controlFlowGraph->mapCallOut(fromN, toN, 0, cnt, type == 'C', type == 'T',
                                             type == 'R');
   }
 }

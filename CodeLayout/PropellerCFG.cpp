@@ -189,18 +189,20 @@ bool ControlFlowGraph::markPath(CFGNode *from, CFGNode *to, uint64_t cnt) {
 // Apply counter (cnt) to the edge from node from -> to. Both nodes are from the
 // same cfg.
 void ControlFlowGraph::mapBranch(CFGNode *from, CFGNode *to, uint64_t cnt,
-                                 bool isCall, bool isReturn) {
+                                 bool isTailCall, bool isCall, bool isReturn) {
   assert(from->controlFlowGraph == to->controlFlowGraph);
 
   for (auto &e : from->outs) {
     bool edgeTypeOk = true;
-    if (!isCall && !isReturn)
+    if (!isCall && !isReturn && !isTailCall)
       edgeTypeOk =
           e->type == CFGEdge::INTRA_FUNC || e->type == CFGEdge::INTRA_DYNA;
     else if (isCall)
       edgeTypeOk = e->type == CFGEdge::INTRA_RSC;
     if (isReturn)
       edgeTypeOk = e->type == CFGEdge::INTRA_RSR;
+    if (isTailCall)
+      edgeTypeOk = e->type == CFGEdge::INTRA_RSTC;
     if (edgeTypeOk && e->sink == to) {
       e->weight += cnt;
       return;
@@ -212,19 +214,23 @@ void ControlFlowGraph::mapBranch(CFGNode *from, CFGNode *to, uint64_t cnt,
     type = CFGEdge::INTRA_RSC;
   else if (isReturn)
     type = CFGEdge::INTRA_RSR;
+  else if (isTailCall)
+    type = CFGEdge::INTRA_RSTC;
 
   createEdge(from, to, type)->weight += cnt;
 }
 
 // Apply counter (cnt) for calls/returns/ that cross function boundaries.
 void ControlFlowGraph::mapCallOut(CFGNode *from, CFGNode *to, uint64_t toAddr,
-                                  uint64_t cnt, bool isCall, bool isReturn) {
+                                  uint64_t cnt, bool isCall, bool isTailCall, bool isReturn) {
   assert(from->controlFlowGraph == this);
   assert(from->controlFlowGraph != to->controlFlowGraph);
   CFGEdge::EdgeType edgeType = CFGEdge::INTER_FUNC_RETURN;
   if (isCall || (toAddr && to->controlFlowGraph->getEntryNode() == to &&
                  toAddr == to->symbol->ordinal))
     edgeType = CFGEdge::INTER_FUNC_CALL;
+  if (isTailCall)
+    edgeType = CFGEdge::INTER_FUNC_TAIL_CALL;
   if (isReturn)
     edgeType = CFGEdge::INTER_FUNC_RETURN;
   for (auto &e : from->callOuts)

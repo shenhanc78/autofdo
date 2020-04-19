@@ -61,7 +61,7 @@ CallChainClustering::getMostLikelyPredecessor(NodeChain *chain,
       auto visit = [&clusterEdge, n, chain, cluster, this](CFGEdge &edge) {
         if (!edge.weight || edge.isReturn())
           return;
-        if (!propConfig.optReorderIP && !edge.isCall())
+        if (!propConfig.optReorderIP && !edge.isCall() && !edge.isTailCall())
           return;
         auto *callerChain = getNodeChain(edge.src);
         if (!callerChain) {

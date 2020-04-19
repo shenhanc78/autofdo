@@ -121,7 +121,7 @@ void NodeChainBuilder::attachFallThroughs() {
     // Sometimes, the original fall-throughs cannot be kept. So we try to find
     // new fall-through opportunities which did not exist in the original order.
     for (auto &edge : cfg->intraEdges)
-      if (!edge->isCall() && !edge->isReturn())
+      if (!edge->isCall() && !edge->isReturn() && !edge->isTailCall())
         attachNodes(edge->src, edge->sink);
   }
 }
@@ -598,7 +598,7 @@ void NodeChainBuilder::initBundles(
   for(auto& edge: cfg.intraEdges) {
     if (!edge->weight)
       continue;
-    if (edge->isCall() || edge->isReturn())
+    if (edge->isCall() || edge->isReturn() || edge->isTailCall())
       continue;
     auto r = singleHotOut.try_emplace(edge->src, edge->sink);
     if (!r.second && r.first->second)
