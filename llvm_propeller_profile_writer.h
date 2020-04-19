@@ -22,6 +22,8 @@
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/ProfileData/BBSectionsProf.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "CodeLayout/PropellerCFG.h"
+#include "CodeLayout/CodeLayout.h"
 
 using std::list;
 using std::map;
@@ -39,6 +41,9 @@ using std::vector;
 using llvm::propeller::SymbolEntry;
 using llvm::SmallVector;
 using llvm::StringRef;
+
+using llvm::propeller::ControlFlowGraph;
+using llvm::propeller::CFGNode;
 
 namespace quipper {
 class PerfParser;
@@ -140,7 +145,7 @@ class MMapEntry {
 
 class PropellerProfWriter {
  public:
-  PropellerProfWriter(const string &bfn, const string &pfn, const string &ofn);
+  PropellerProfWriter(const string &bfn, const string &pfn, const string &ofn, const string &sofn);
   ~PropellerProfWriter();
 
   bool write();
@@ -149,13 +154,17 @@ class PropellerProfWriter {
   const string binaryFileName;
   const string perfFileName;
   const string propOutFileName;
+  const string symOrderFileName;
 
   // binaryFileContent must be the last one to be destroyed.
   // So it appears first in this section.
   unique_ptr<llvm::MemoryBuffer> binaryFileContent;
   unique_ptr<llvm::object::ObjectFile> objFile;
   // All symbol handlers.
-  map<StringRef, unique_ptr<SymbolEntry>> symbolNameMap;
+  map<StringRef, map<StringRef, unique_ptr<SymbolEntry>>> symbolNameMap;
+  map<SymbolEntry *, std::vector<SymbolEntry*>> symbolEntryMap;
+  map<SymbolEntry *, std::unique_ptr<ControlFlowGraph>> cfgs;
+  map<SymbolEntry *, CFGNode *> symbolNodeMap;
   // Symbol start address -> Symbol list.
   map<uint64_t, list<SymbolEntry *>> addrMap;
   using CounterTy = map<pair<uint64_t, uint64_t>, uint64_t>;
@@ -242,6 +251,7 @@ class PropellerProfWriter {
 
   bool initBinaryFile();
   bool populateSymbolMap();
+  bool populateSymbolMap2();
   bool parsePerfData();
   bool parsePerfData(const string &pName);
   void writeOuts(ofstream &fout);
