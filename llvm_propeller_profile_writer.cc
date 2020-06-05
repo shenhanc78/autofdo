@@ -115,6 +115,59 @@ SymbolEntry *PropellerProfWriter::findSymbolAtAddress(uint64_t pid,
   return *candidates.begin();
 }
 
+void help_generate_full_permutation(const vector<CFGNode *> &origin,
+				    vector<CFGNode *> *current,
+				    vector<vector<CFGNode *>> *permutation,
+				    set<int> *taken,
+				    int leveli) {
+  int N = origin.size();
+  if (leveli == N) {
+    permutation->emplace_back(*current);  // note current is unchanged afterwards.
+    return;
+  }
+  for (int i = 0; i < N; ++i) {
+    if (taken->find(i) == taken->end()) {
+      (*current)[leveli] = origin[i];
+      auto token = taken->insert(i).first;
+      help_generate_full_permutation(origin, current, permutation, taken, leveli + 1);
+      taken->erase(token);
+    }
+  }
+}
+
+vector<vector<CFGNode *>> generate_full_permutation(vector<CFGNode *> &origin) {
+  vector<vector<CFGNode *>> permutation;
+  if (origin.size() <= 6) {
+    set<int> taken;
+    vector<CFGNode *> current(origin.size(), nullptr);
+    help_generate_full_permutation(origin, &current, &permutation, &taken, 0);
+    // fprintf(stderr, ">>>>>>>>>>\n");
+    // for (auto &p : permutation) {
+    //   for (auto &q : p) {
+    // 	fprintf(stderr, " %s", q->symbol->name.str().c_str());
+    //   }
+    //   fprintf(stderr, "\n");
+    // }
+    // fprintf(stderr, "<<<<<<<<<<\n");
+    // exit(0);
+  } else {
+    std::srand(reinterpret_cast<unsigned long long>(static_cast<void *>(origin.back())));
+    for (int i = 0; i < 720; ++i) {
+      std::random_shuffle(origin.begin(), origin.end());
+      permutation.emplace_back(origin);
+    }
+    // fprintf(stderr, ">>>>>>>>>>\n");
+    // for (auto &p : permutation) {
+    //   for (auto &q : p) {
+    // 	fprintf(stderr, " %s", q->symbol->name.str().c_str());
+    //   }
+    //   fprintf(stderr, "\n");
+    // }
+    // fprintf(stderr, "<<<<<<<<<<\n");
+  }
+  return permutation;
+}
+
 bool PropellerProfWriter::write() {
   if (!(initBinaryFile() && findBinaryBuildId() &&
         ((FLAGS_dot_number_encoding && populateSymbolMap2()) ||
@@ -174,33 +227,62 @@ bool PropellerProfWriter::write() {
     }
     partEnd = fout.tellp();
 
+    bool doing_hot = true;
+    vector<CFGNode *> func_hot_nodes;
     for(auto *n: section_order) {
+      if (!n) {
+	doing_hot = false;
+	continue;
+      }
       if (n->symbol->isFunction()) {
-	sout << n->symbol->name.str() << "\n";
-      } else {
-	ControlFlowGraph *cfg = n->controlFlowGraph;
-	int found = -1;
-	int i = 0;
-	for (auto &p : cfg->clusters) {
-	  std::vector<CFGNode *> &cnodes = p.second;
-	  for (auto *cn : cnodes) {
-	    if (cn == n) {
-	      found = i;
-	      break;
+	if (doing_hot) {
+	  ControlFlowGraph *cfg = n->controlFlowGraph;
+	  func_hot_nodes.clear();
+	  for (auto &p : cfg->clusters) {
+	    std::vector<CFGNode *> &cnodes = p.second;
+	    func_hot_nodes.insert(func_hot_nodes.end(), cnodes.begin(), cnodes.end());
+	  }
+	  if (func_hot_nodes.size() >= 2) {
+	    auto permutation = generate_full_permutation(func_hot_nodes);
+	    int pm_size = permutation.front().size();
+	    for (int i = 0; i < pm_size; ++i) {
+	      sout << n->symbol->name.str() << " |";
+	      for (auto &j : permutation) {
+		CFGNode *q = j[i];
+		sout <<  " " << q->symbol->name.str();
+	      }
+	      sout << "\n";
 	    }
 	  }
-	  ++i;
-	  if (found != -1)
-	    break;
-	}
-	if (found == -1) {
-	  if (n->symbol->isLandingPadBlock())
-	    sout << n->symbol->containingFunc->name.str() + ".eh\n";
-	  else
-	    sout << n->symbol->containingFunc->name.str() + ".cold\n";
 	} else {
-	  sout << n->symbol->containingFunc->name.str() + "." +
-	    std::to_string(found) << "\n";
+	  sout << n->symbol->name.str() << "\n";
+	}
+      } else {
+	if (!doing_hot) {
+	  ControlFlowGraph *cfg = n->controlFlowGraph;
+	  int found = -1;
+	  int i = 0;
+	  for (auto &p : cfg->clusters) {
+	    std::vector<CFGNode *> &cnodes = p.second;
+	    for (auto *cn : cnodes) {
+	      if (cn == n) {
+		found = i;
+		break;
+	      }
+	    }
+	    ++i;
+	    if (found != -1)
+	      break;
+	  }
+	  if (found == -1) {
+	    if (n->symbol->isLandingPadBlock())
+	      sout << n->symbol->containingFunc->name.str() + ".eh\n";
+	    else
+	      sout << n->symbol->containingFunc->name.str() + ".cold\n";
+	  } else {
+	    sout << n->symbol->containingFunc->name.str() + "." +
+	      std::to_string(found) << "\n";
+	  }
 	}
       }
     }
@@ -941,13 +1023,15 @@ bool PropellerProfWriter::populateSymbolMap() {
   for (const auto &sym : symbols) {
     auto addrR = sym.getAddress();
     auto secR = sym.getSection();
-    auto NameR = sym.getName();
+    auto nameR = sym.getName();
     auto typeR = sym.getType();
 
-    if (!(addrR && *addrR && secR && (*secR)->isText() && NameR && typeR))
+    if (!(addrR && secR && nameR && typeR)) continue;
+
+    if (!(addrR && *addrR && secR && (*secR)->isText() && nameR && typeR))
       continue;
 
-    StringRef name = *NameR;
+    StringRef name = *nameR;
     if (name.empty()) continue;
     uint64_t addr = *addrR;
     uint8_t type(*typeR);
@@ -1481,8 +1565,8 @@ bool PropellerProfWriter::findBinaryBuildId() {
       continue;
     }
     auto expectedSContents = sr.getContents();
-    if (esr.getType() == llvm::ELF::SHT_NOTE && sName == ".note.gnu.build-id" &&
-        expectedSContents && !expectedSContents->empty()) {
+    if (expectedSContents && esr.getType() == llvm::ELF::SHT_NOTE && sName == ".note.gnu.build-id" &&
+        !expectedSContents->empty()) {
       StringRef sContents = *expectedSContents;
       const unsigned char *p = sContents.bytes_begin() + 0x10;
       if (p >= sContents.bytes_end()) {

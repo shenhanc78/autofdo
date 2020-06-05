@@ -140,6 +140,8 @@ void CodeLayout::doOrder(std::map<SymbolEntry*, std::unique_ptr<ControlFlowGraph
     cfg->clusters.back().second.push_back(n);
   }
 
+  section_order.push_back(nullptr);
+
   for (CFGNode *n : cold_order)
     section_order.push_back(n);
 
