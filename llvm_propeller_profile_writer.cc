@@ -242,7 +242,7 @@ bool PropellerProfWriter::write() {
 	    std::vector<CFGNode *> &cnodes = p.second;
 	    func_hot_nodes.insert(func_hot_nodes.end(), cnodes.begin(), cnodes.end());
 	  }
-	  if (func_hot_nodes.size() >= 2) {
+	  if (func_hot_nodes.size() >= 1) {
 	    auto permutation = generate_full_permutation(func_hot_nodes);
 	    int pm_size = permutation.front().size();
 	    for (int i = 0; i < pm_size; ++i) {
