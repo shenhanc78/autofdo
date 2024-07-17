@@ -19,7 +19,8 @@ env:
 
 jobs:
   build_release:
-    runs-on: ubuntu-22.04-8core
+    # this is for google only: runs-on: ubuntu-22.04-8core
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
