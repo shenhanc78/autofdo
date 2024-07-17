@@ -7,6 +7,7 @@ project(autofdo)
 function (execute_perf_protobuf)
 
   find_package(Protobuf REQUIRED)
+  # set (protobuf_BUILD_SHARED_LIBS OFF)
 
   add_library(perf_proto
     third_party/perf_data_converter/src/quipper/perf_data.proto
@@ -165,6 +166,10 @@ function (build_llvm)
   set (LLVM_ENABLE_ZSTD FORCE_ON)
   ###
 
+  find_library (LIBELF_LIBRARIES NAMES libelf.a REQUIRED)
+  find_library (LIBZ_LIBRARIES NAMES libz.a REQUIRED)
+  find_library (LIBCRYPTO_LIBRARIES NAMES libcrypto.a REQUIRED)
+
   add_subdirectory(third_party/abseil)
   add_subdirectory(third_party/glog)
   add_subdirectory(third_party/googletest)
@@ -303,12 +308,12 @@ function (build_llvm)
     perfdata_reader
     profile_creator
     profile_reader
-    quipper_perf
     sample_reader
     status_provider
     symbol_map
     LLVMDebugInfoDWARF
-    LLVMSupport)
+    LLVMSupport
+    quipper_perf)
 
   add_executable(sample_merger sample_merger.cc)
   target_link_libraries(sample_merger
@@ -361,9 +366,6 @@ function (build_llvm)
     symbol_map
     LLVMSupport)
   add_test(NAME symbol_map_test COMMAND symbol_map_test)
-
-  find_library (LIBELF_LIBRARIES NAMES elf REQUIRED)
-  find_library (LIBCRYPTO_LIBRARIES NAMES crypto REQUIRED)
 
   add_executable(llvm_profile_reader_test llvm_profile_reader_test.cc)
   target_link_libraries(llvm_profile_reader_test
@@ -780,7 +782,7 @@ function (build_llvm)
     third_party/perf_data_converter/src/quipper
     ${PROJECT_BINARY_DIR}/third_party/perf_data_converter/src/quipper)
   target_link_libraries(quipper_perf
-    perf_proto ${LIBELF_LIBRARIES} ${LIBCRYPTO_LIBRARIES})
+    perf_proto ${LIBELF_LIBRARIES} ${LIBZ_LIBRARIES} ${LIBCRYPTO_LIBRARIES})
 
   add_custom_command(PRE_BUILD
     OUTPUT prepare_cmds
