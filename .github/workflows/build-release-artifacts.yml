@@ -1,5 +1,5 @@
 # This starter workflow is for a CMake project running on a single platform.
-name: Build release binaries
+name: Build Release Binaries
 
 # on:
 #   push:
@@ -28,7 +28,7 @@ jobs:
         submodules: 'recursive'
         ref: '${{github.ref}}'
 
-    - name: install dependencies
+    - name: Install Dependencies
       run: sudo apt-get -y install libunwind-dev libgflags-dev libssl-dev libelf-dev protobuf-compiler libzstd-dev
 
     - name: Configure CMake
@@ -40,7 +40,7 @@ jobs:
       # Build your program with the given configuration
       run: make -C ${{github.workspace}}/build -j6
 
-    - name: run tests
+    - name: Run Tests
       run: make -C ${{github.workspace}}/build test
 
     # - uses: actions/upload-artifact@v4
@@ -48,7 +48,7 @@ jobs:
     #     name: create_llvm_prof.zip
     #     path: ${{github.workspace}}/build/create_llvm_prof
 
-    - name: Create release
+    - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
@@ -60,7 +60,7 @@ jobs:
         draft: false
         prerelease: false
 
-    - name: Create zip package
+    - name: Create Zip Package
       run: |
         zip --junk-paths create_llvm_prof-x86_64-master.zip ${{github.workspace}}/build/create_llvm_prof
 
