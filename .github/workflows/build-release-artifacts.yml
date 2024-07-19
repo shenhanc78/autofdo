@@ -17,7 +17,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{github.token}}
     - name: Print Release
-      run: echo "Found release ${{steps.get_release.outputs.tag_name}}\nHTML URL: ${{steps.get_release.outputs.html_url}}\nUpload URL: ${{steps.get_release.outputs.upload_url}}"
+      run: echo Found release ${{steps.get_release.outputs.tag_name}}\nHTML URL: ${{steps.get_release.outputs.html_url}}\nUpload URL: ${{steps.get_release.outputs.upload_url}}
 
     - uses: actions/checkout@v4
       with:
