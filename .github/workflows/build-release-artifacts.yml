@@ -18,9 +18,9 @@ jobs:
         GITHUB_TOKEN: ${{github.token}}
     - shell: bash
       run: |
-        echo Found release ${{steps.get_release.outputs.tag_name}}
-        echo HTML URL: ${{steps.get_release.outputs.html_url}}
-        echo Upload URL: ${{steps.get_release.outputs.upload_url}}
+        echo "Found release ${{steps.get_release.outputs.tag_name}}"
+        echo "HTML URL: ${{steps.get_release.outputs.html_url}}"
+        echo "Upload URL: ${{steps.get_release.outputs.upload_url}}"
 
     - uses: actions/checkout@v4
       with:
