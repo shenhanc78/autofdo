@@ -3,11 +3,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(ABSL_PROPAGATE_CXX_STD on)
 
 project(autofdo)
+set (Protobuf_USE_STATIC_LIBS TRUE)
 
 function (execute_perf_protobuf)
 
   find_package(Protobuf REQUIRED)
-  # set (protobuf_BUILD_SHARED_LIBS OFF)
 
   add_library(perf_proto
     third_party/perf_data_converter/src/quipper/perf_data.proto
@@ -144,13 +144,18 @@ function (build_llvm)
      message(WARNING "Could not get clang commit hash : Use clang git hash " ${CLANG_KNOWN_GIT_COMMIT_HASH})
   else()
      string(REGEX MATCH "([0-9|a-f]+)" CLANG_GIT_COMMIT_HASH ${CLANG_VERSION_OUTPUT})
-     string(SUBSTRING ${CLANG_GIT_COMMIT_HASH} 0 12 CLANG_GIT_COMMIT_HASH_12)
-     if ("${CLANG_GIT_COMMIT_HASH_12}" STREQUAL ${CLANG_KNOWN_GIT_COMMIT_HASH})
+     if ("${CLANG_GIT_COMMIT_HASH}" STREQUAL ${CLANG_KNOWN_GIT_COMMIT_HASH})
        message(STATUS "Found known git commit hash of clang (" ${CLANG_GIT_COMMIT_HASH} ") - Success")
      else()
-       message(FATAL_ERROR "Unverified git commit hash of llvm source - ${CLANG_GIT_COMMIT_HASH_12}. Do not modify or update third_party/llvm-project")
+       message(FATAL_ERROR "Unverified git commit hash of llvm source - ${CLANG_GIT_COMMIT_HASH}. Do not modify or update third_party/llvm-project")
      endif()
   endif()
+
+  # Disable GFLAGS and UNWIND for glog, we do not control glog using
+  # gflags, nor does call stacks used in log information. And glog
+  # does not provide a way to force static link these two libraries.
+  set (WITH_GFLAGS OFF)
+  set (WITH_UNWIND OFF)
 
   ### LLVM Configuration
   set (LLVM_INCLUDE_UTILS OFF)
@@ -164,11 +169,10 @@ function (build_llvm)
   set (LLVM_TARGETS_TO_BUILD X86 AArch64 CACHE STRING
     "Semicolon-separated list of LLVM targets to build, or \"all\".")
   set (LLVM_ENABLE_ZSTD FORCE_ON)
+  set (LLVM_USE_STATIC_ZSTD TRUE CACHE BOOL "use static zstd")
+  # terminfo is not needed by create_llvm_prof
+  set (LLVM_ENABLE_TERMINFO OFF CACHE BOOL "enable terminfo")
   ###
-
-  find_library (LIBELF_LIBRARIES NAMES libelf.a REQUIRED)
-  find_library (LIBZ_LIBRARIES NAMES libz.a REQUIRED)
-  find_library (LIBCRYPTO_LIBRARIES NAMES libcrypto.a REQUIRED)
 
   add_subdirectory(third_party/abseil)
   add_subdirectory(third_party/glog)
@@ -308,12 +312,12 @@ function (build_llvm)
     perfdata_reader
     profile_creator
     profile_reader
+    quipper_perf
     sample_reader
     status_provider
     symbol_map
     LLVMDebugInfoDWARF
-    LLVMSupport
-    quipper_perf)
+    LLVMSupport)
 
   add_executable(sample_merger sample_merger.cc)
   target_link_libraries(sample_merger
@@ -366,6 +370,10 @@ function (build_llvm)
     symbol_map
     LLVMSupport)
   add_test(NAME symbol_map_test COMMAND symbol_map_test)
+
+  find_library (LIBELF_LIBRARIES NAMES elf REQUIRED)
+  find_library (LIBZ_LIBRARIES NAMES z REQUIRED)
+  find_library (LIBCRYPTO_LIBRARIES NAMES crypto REQUIRED)
 
   add_executable(llvm_profile_reader_test llvm_profile_reader_test.cc)
   target_link_libraries(llvm_profile_reader_test
@@ -804,6 +812,13 @@ if (${enable_tool} STREQUAL gcov)
   build_gcov()
 elseif (${enable_tool} STREQUAL llvm)
   message(STATUS "Building tool \"LLVM\" ...")
+
+  # Build static binaries.
+  set (BUILD_SHARED_LIBS OFF)
+  set (CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+  # Link static executables.
+  set (CMAKE_EXE_LINKER_FLAGS "-static")
+
   build_llvm()
 else ()
   message(FATAL_ERROR
